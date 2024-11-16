@@ -3,4 +3,4 @@
 
 package main
 
-//go:generate bpf2go -cc clang mad ./bpf/mad.c -- -g -mcpu=v3 -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang mad ./bpf/mad.c -- -g -mcpu=v3 -D__TARGET_ARCH_x86 -I./bpf/headers -Wall
