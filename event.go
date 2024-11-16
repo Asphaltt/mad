@@ -115,8 +115,9 @@ func outputEvent(buff []byte, maps *bpfMaps, sb *strings.Builder) {
 		fmt.Fprintf(sb, "key: ")
 	}
 
+	eventData := event.Data[:min(event.Len, uint16(len(event.Data)))]
 	if hexdump || event.BtfID == 0 {
-		fmt.Fprintf(sb, "%s [%d bytes]", hex.EncodeToString(event.Data[:event.Len]), event.Len)
+		fmt.Fprintf(sb, "%s [%d bytes]", hex.EncodeToString(eventData), len(eventData))
 	} else {
 		spec := info.spec
 		if event.isVmlinux() {
@@ -127,7 +128,7 @@ func outputEvent(buff []byte, maps *bpfMaps, sb *strings.Builder) {
 		if err != nil {
 			fmt.Fprintf(sb, "failed to get type: %v", err)
 		} else {
-			data, err := mybtf.DumpData(typ, event.Data[:event.Len])
+			data, err := mybtf.DumpData(typ, eventData)
 			if err != nil {
 				fmt.Fprintf(sb, "%s / with err: %v", data, err)
 			} else {
