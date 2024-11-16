@@ -63,16 +63,14 @@ struct mad_map_info {
     __u32 vmlinux_value_btf_id;
 };
 
+#define min(x, y) ((x) < (y) ? (x) : (y))
+
 static __always_inline void
 emit_ringbuf(struct mad_buff *buff, void *data, __u32 btf_id, __u32 data_size)
 {
-    long ret = -1;
     __u64 size;
 
-    if (data_size <= sizeof(buff->data))
-        ret = bpf_probe_read_kernel(&buff->data, data_size, data);
-    if (ret < 0)
-        return;
+    bpf_probe_read_kernel(&buff->data, min(data_size, sizeof(buff->data)), data);
 
     buff->btf_id = btf_id;
     buff->nr_bytes = data_size;
@@ -87,7 +85,7 @@ emit_mad_event(struct mad_map_info *info, bool is_delete, void *key, void *value
     struct mad_buff *buff;
 
     buff = get_mad_buff();
-    if (!buff)
+    if (!buff || info->value_size > sizeof(buff->data))
         return;
 
     buff->event_id = __sync_fetch_and_add(&event_id, 1);
