@@ -8,12 +8,15 @@
 volatile const __u32 EVENTS_MAP_ID;
 volatile const __u32 MY_PID;
 
+static __u32 event_id;
+
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 4096<<8);
 } events SEC(".maps");
 
 struct mad_buff {
+    __u32 event_id;
     __s32 retval;
     __u32 pid;
     __u8 comm[16];
@@ -25,7 +28,7 @@ struct mad_buff {
     __u16 is_vmlinux:1;
     __u16 pad:13;
     __u16 nr_bytes;
-    __u8 data[2048 - 40];
+    __u8 data[2048 - 44];
 } __attribute__((packed));
 
 struct {
@@ -80,6 +83,7 @@ emit_mad_event(struct mad_map_info *info, bool is_delete, void *key, void *value
     if (!buff)
         return;
 
+    buff->event_id = __sync_fetch_and_add(&event_id, 1);
     buff->retval = retval;
     buff->pid = bpf_get_current_pid_tgid() >> 32;
     bpf_get_current_comm(buff->comm, sizeof(buff->comm));

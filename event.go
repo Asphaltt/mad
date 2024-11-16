@@ -22,6 +22,7 @@ const (
 )
 
 type madEventMeta struct {
+	Seq      uint32
 	Retval   int32
 	Pid      uint32
 	Comm     [16]byte
@@ -34,7 +35,7 @@ type madEventMeta struct {
 
 type madEvent struct {
 	madEventMeta
-	Data [2048 - 40]byte
+	Data [2048 - 44]byte
 }
 
 const sizeofMadEvent = uint32(unsafe.Sizeof(madEvent{})) /* sizeof(struct mad_buff) */
@@ -96,6 +97,8 @@ func outputEvent(buff []byte, maps *bpfMaps, sb *strings.Builder) {
 	if !ok {
 		return
 	}
+
+	fmt.Fprintf(sb, "%d: ", event.Seq)
 
 	fmt.Fprintf(sb, "map(%d:%s:%s) ", event.MapID, info.Name, info.Type.String())
 
