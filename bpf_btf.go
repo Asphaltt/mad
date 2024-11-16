@@ -6,31 +6,16 @@ package main
 import (
 	"strings"
 
+	"github.com/Asphaltt/mybtf"
 	"github.com/cilium/ebpf/btf"
 )
 
 func isBpfMap(typ btf.Type) bool {
-	ptr, ok := typ.(*btf.Pointer)
-	if !ok {
-		return false
-	}
-
-	strct, ok := ptr.Target.(*btf.Struct)
-	if !ok {
-		return false
-	}
-
-	return strct.Name == "bpf_map"
+	return mybtf.IsStructPointer(typ, "bpf_map")
 }
 
 func isVoid(typ btf.Type) bool {
-	ptr, ok := typ.(*btf.Pointer)
-	if !ok {
-		return false
-	}
-
-	_, ok = ptr.Target.(*btf.Void)
-	return ok
+	return mybtf.IsVoidPointer(typ)
 }
 
 func isTgtFunc(typ btf.Type) (string, bool) {

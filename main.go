@@ -30,8 +30,6 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "Print verbose output")
 	flag.Parse()
 
-	assert.True(hexdump, "--hexdump is required, BTF data dumping is not implemented yet")
-
 	assert.NoErr(rlimit.RemoveMemlock(), "Failed to remove memlock rlimit: %v")
 
 	btfSpec, err := btf.LoadKernelSpec()
@@ -69,7 +67,7 @@ func main() {
 	assert.NoVerifierErr(err, "Failed to trace functions: %v")
 	defer t.close()
 
-	maps := newBpfMaps()
+	maps := newBpfMaps(btfSpec)
 
 	reader, err := ringbuf.NewReader(events)
 	assert.NoErr(err, "Failed to create ringbuf reader: %v")

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"unsafe"
 
+	"github.com/Asphaltt/mybtf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/ringbuf"
 )
 
@@ -19,7 +21,7 @@ const (
 	madEventFlagsIndexMapOrVmlinux
 )
 
-type madEvent struct {
+type madEventMeta struct {
 	Retval   int32
 	Pid      uint32
 	Comm     [16]byte
@@ -28,7 +30,11 @@ type madEvent struct {
 	BtfID    uint32
 	Flags    uint16
 	Len      uint16
-	Buff     [2048 - 40]byte
+}
+
+type madEvent struct {
+	madEventMeta
+	Data [2048 - 40]byte
 }
 
 const sizeofMadEvent = uint32(unsafe.Sizeof(madEvent{})) /* sizeof(struct mad_buff) */
@@ -86,7 +92,7 @@ func nullTermStr(b []byte) string {
 func outputEvent(buff []byte, maps *bpfMaps, sb *strings.Builder) {
 	event := (*madEvent)(unsafe.Pointer(&buff[0]))
 
-	info, ok := maps.mapInfo(event.MapID)
+	info, ok := maps.mapInfo(event.MapID, event.MapBtfID)
 	if !ok {
 		return
 	}
@@ -106,10 +112,25 @@ func outputEvent(buff []byte, maps *bpfMaps, sb *strings.Builder) {
 		fmt.Fprintf(sb, "key: ")
 	}
 
-	if hexdump {
-		fmt.Fprintf(sb, "%s [%d bytes]", hex.EncodeToString(event.Buff[:event.Len]), event.Len)
+	if hexdump || event.BtfID == 0 {
+		fmt.Fprintf(sb, "%s [%d bytes]", hex.EncodeToString(event.Data[:event.Len]), event.Len)
 	} else {
-		fmt.Fprint(sb, unsafe.String(&event.Buff[0], int(event.Len)))
+		spec := info.spec
+		if event.isVmlinux() {
+			spec = maps.kernel
+		}
+
+		typ, err := spec.TypeByID(btf.TypeID(event.BtfID))
+		if err != nil {
+			fmt.Fprintf(sb, "failed to get type: %v", err)
+		} else {
+			data, err := mybtf.DumpData(typ, event.Data[:event.Len])
+			if err != nil {
+				fmt.Fprintf(sb, "%s / with err: %v", data, err)
+			} else {
+				fmt.Fprintf(sb, "%s", data)
+			}
+		}
 	}
 
 	fmt.Fprintln(sb)

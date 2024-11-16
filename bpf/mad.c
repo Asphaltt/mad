@@ -126,6 +126,8 @@ fexit_fn(struct bpf_map *map, void *key, void *value, bool is_delete, long retva
 
     info.id = map_id;
     read_bpf_map_info(map, &info);
+    // bpf_printk("mad, map_id: %u, map_btf_id: %u, key_size: %u, value_size: %u, key_btf_id: %u, value_btf_id: %u, vmlinux_value_btf_id: %u\n",
+    //            info.id, info.btf_id, info.key_size, info.value_size, info.key_btf_id, info.value_btf_id, info.vmlinux_value_btf_id);
     emit_mad_event(&info, is_delete, key, value, retval);
 
     return BPF_OK;
