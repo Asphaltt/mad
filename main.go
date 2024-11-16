@@ -26,8 +26,10 @@ var (
 )
 
 func main() {
+	var pid uint32
 	flag.BoolVar(&hexdump, "hexdump", false, "Print hexdump of key/value")
 	flag.BoolVar(&verbose, "verbose", false, "Print verbose output")
+	flag.Uint32Var(&pid, "pid", 0, "Filter a specific PID")
 	flag.Parse()
 
 	assert.NoErr(rlimit.RemoveMemlock(), "Failed to remove memlock rlimit: %v")
@@ -52,9 +54,18 @@ func main() {
 	eventsMapID, ok := eventsInfo.ID()
 	assert.True(ok, "Failed to get events map ID")
 
+	type madCfgs struct {
+		EventsMapID uint32
+		MyPID       uint32
+		PID         uint32
+	}
+
 	err = spec.RewriteConstants(map[string]interface{}{
-		"EVENTS_MAP_ID": uint32(eventsMapID),
-		"MY_PID":        uint32(os.Getpid()),
+		"CFG": madCfgs{
+			EventsMapID: uint32(eventsMapID),
+			MyPID:       uint32(os.Getpid()),
+			PID:         pid,
+		},
 	})
 	assert.NoErr(err, "Failed to rewrite constants: %v")
 
