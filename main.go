@@ -56,6 +56,7 @@ func main() {
 
 	err = spec.RewriteConstants(map[string]interface{}{
 		"EVENTS_MAP_ID": uint32(eventsMapID),
+		"MY_PID":        uint32(os.Getpid()),
 	})
 	assert.NoErr(err, "Failed to rewrite constants: %v")
 

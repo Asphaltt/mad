@@ -6,6 +6,7 @@
 #include "bpf_core_read.h"
 
 volatile const __u32 EVENTS_MAP_ID;
+volatile const __u32 MY_PID;
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -110,9 +111,13 @@ static __noinline int
 fexit_fn(struct bpf_map *map, void *key, void *value, bool is_delete, long retval)
 {
     struct mad_map_info info;
-    __u32 map_id;
+    __u32 map_id, pid;
 
     if (!key)
+        return BPF_OK;
+
+    pid = bpf_get_current_pid_tgid() >> 32;
+    if (pid == MY_PID)
         return BPF_OK;
 
     BPF_CORE_READ_INTO(&map_id, map, id);
