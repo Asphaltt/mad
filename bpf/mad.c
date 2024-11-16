@@ -9,6 +9,7 @@ struct mad_cfgs {
     __u32 events_map_id;
     __u32 my_pid;
     __u32 pid;
+    __u32 map_id;
 };
 
 volatile const struct mad_cfgs CFG;
@@ -130,6 +131,9 @@ filter(__u32 map_id)
         return false;
 
     if (cfg->pid && pid != cfg->pid)
+        return false;
+
+    if (cfg->map_id && map_id != cfg->map_id)
         return false;
 
     return true;
