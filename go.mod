@@ -3,7 +3,7 @@ module github.com/Asphaltt/mad
 go 1.23.0
 
 require (
-	github.com/Asphaltt/mybtf v0.0.0-20241116055726-6e3de032870b
+	github.com/Asphaltt/mybtf v0.0.0-20241116145132-34c53811133f
 	github.com/cilium/ebpf v0.16.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/sync v0.1.0

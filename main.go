@@ -5,9 +5,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 
 	"github.com/cilium/ebpf"
@@ -18,6 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/Asphaltt/mad/internal/assert"
+	"github.com/Asphaltt/mybtf"
 )
 
 var (
@@ -77,9 +80,34 @@ func main() {
 		"events":      events,
 	}
 
-	t, err := traceFuncs(hooks, spec, reusedMaps)
-	assert.NoVerifierErr(err, "Failed to trace functions: %v")
-	defer t.close()
+	slices.Sort(hooks)
+	haveKprobeMulti := mybtf.HaveEnumValue(btfSpec, "bpf_attach_type", "BPF_TRACE_KPROBE_MULTI")
+	// haveKprobeMulti = false
+	if haveKprobeMulti {
+		delete(spec.Programs, fexitUpdateMapProgName)
+		delete(spec.Programs, fexitDeleteMapProgName)
+		if verbose {
+			log.Printf("Tracing functions with kprobe.multi:")
+			for _, hook := range hooks {
+				fmt.Printf("  %s\n", hook)
+			}
+		}
+		bk, err := kprobeFuncs(hooks, spec, reusedMaps)
+		assert.NoVerifierErr(err, "Failed to trace functions with kprobe.multi: %v")
+		defer bk.close()
+	} else {
+		delete(spec.Programs, kprobeUpdateMapProgName)
+		delete(spec.Programs, kprobeDeleteMapProgName)
+		if verbose {
+			log.Printf("Tracing functions with fexit:")
+			for _, hook := range hooks {
+				fmt.Printf("  %s\n", hook)
+			}
+		}
+		t, err := traceFuncs(hooks, spec, reusedMaps)
+		assert.NoVerifierErr(err, "Failed to trace functions with fexit: %v")
+		defer t.close()
+	}
 
 	maps := newBpfMaps(btfSpec)
 
@@ -100,7 +128,7 @@ func main() {
 	})
 
 	errg.Go(func() error {
-		return readEvents(reader, maps)
+		return readEvents(reader, maps, !haveKprobeMulti)
 	})
 
 	assert.NoErr(errg.Wait(), "Error: %v")

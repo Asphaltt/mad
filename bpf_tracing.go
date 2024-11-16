@@ -5,14 +5,17 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"slices"
 	"strings"
 	"sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	fexitUpdateMapProgName = "fexit_update_elem"
+	fexitDeleteMapProgName = "fexit_delete_elem"
 )
 
 type bpfTracings struct {
@@ -36,15 +39,12 @@ func (t *bpfTracings) traceFunc(fnName string, spec *ebpf.CollectionSpec, reused
 
 	isDelete := strings.HasSuffix(fnName, "_map_delete_elem")
 
-	const fexitUpdateElem = "fexit_update_elem"
-	const fexitDeleteElem = "fexit_delete_elem"
-
-	progName := fexitUpdateElem
+	progName := fexitUpdateMapProgName
 	if isDelete {
-		progName = fexitDeleteElem
-		delete(spec.Programs, fexitUpdateElem)
+		progName = fexitDeleteMapProgName
+		delete(spec.Programs, fexitUpdateMapProgName)
 	} else {
-		delete(spec.Programs, fexitDeleteElem)
+		delete(spec.Programs, fexitDeleteMapProgName)
 	}
 
 	progSpec := spec.Programs[progName]
@@ -87,12 +87,8 @@ func traceFuncs(hooks []string, spec *ebpf.CollectionSpec, reusedMaps map[string
 
 	var errg errgroup.Group
 
-	slices.Sort(hooks)
 	for _, hook := range hooks {
 		hook := hook
-		if verbose {
-			log.Printf("tracing %s", hook)
-		}
 		errg.Go(func() error {
 			return t.traceFunc(hook, spec, reusedMaps)
 		})

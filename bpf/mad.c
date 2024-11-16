@@ -143,6 +143,8 @@ fexit_fn(struct bpf_map *map, void *key, void *value, bool is_delete, long retva
     struct mad_map_info info;
     __u32 map_id;
 
+    bpf_printk("mad, map:%p key:%p value:%p is_delete:%d retval:%ld\n", map, key, value, is_delete, retval);
+
     if (!key)
         return BPF_OK;
 
@@ -169,6 +171,18 @@ SEC("fexit/map_delete_elem")
 int BPF_PROG(fexit_delete_elem, struct bpf_map *map, void *key, long retval)
 {
     return fexit_fn(map, key, NULL, true, retval);
+}
+
+SEC("kprobe.multi")
+int BPF_KPROBE(kprobe_update_elem, struct bpf_map *map, void *key, void *value, __u64 flags)
+{
+    return fexit_fn(map, key, value, false, -1);
+}
+
+SEC("kprobe.multi")
+int BPF_KPROBE(kprobe_delete_elem, struct bpf_map *map, void *key)
+{
+    return fexit_fn(map, key, NULL, true, -1);
 }
 
 char __license[] SEC("license") = "GPL";

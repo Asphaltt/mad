@@ -52,7 +52,7 @@ func (e *madEvent) isVmlinux() bool {
 	return e.Flags&(1<<madEventFlagsIndexMapOrVmlinux) != 0
 }
 
-func readEvents(reader *ringbuf.Reader, maps *bpfMaps) error {
+func readEvents(reader *ringbuf.Reader, maps *bpfMaps, hasRetval bool) error {
 	var rec ringbuf.Record
 	rec.RawSample = make([]byte, sizeofMadEvent)
 
@@ -68,7 +68,7 @@ func readEvents(reader *ringbuf.Reader, maps *bpfMaps) error {
 			return fmt.Errorf("failed to read record: %w", err)
 		}
 
-		outputEvent(rec.RawSample, maps, &sb)
+		outputEvent(rec.RawSample, maps, hasRetval, &sb)
 
 		fmt.Println(sb.String())
 		sb.Reset()
@@ -90,7 +90,7 @@ func nullTermStr(b []byte) string {
 	return unsafe.String(&b[0], len(b))
 }
 
-func outputEvent(buff []byte, maps *bpfMaps, sb *strings.Builder) {
+func outputEvent(buff []byte, maps *bpfMaps, hasRetval bool, sb *strings.Builder) {
 	event := (*madEvent)(unsafe.Pointer(&buff[0]))
 
 	info, ok := maps.mapInfo(event.MapID, event.MapBtfID)
@@ -107,7 +107,13 @@ func outputEvent(buff []byte, maps *bpfMaps, sb *strings.Builder) {
 		action = "delete"
 	}
 
-	fmt.Fprintf(sb, "is %sd by process(%d:%s)\n", action, event.Pid, nullTermStr(event.Comm[:]))
+	fmt.Fprintf(sb, "is %sd by process(%d:%s)", action, event.Pid, nullTermStr(event.Comm[:]))
+
+	if hasRetval {
+		fmt.Fprintf(sb, " with retval(%d)\n", event.Retval)
+	} else {
+		fmt.Fprintln(sb)
+	}
 
 	if event.isValue() {
 		fmt.Fprintf(sb, "value: ")
