@@ -30,11 +30,17 @@ var (
 
 func main() {
 	var pid, mapID uint32
+	var probe string
 	flag.BoolVar(&hexdump, "hexdump", false, "Print hexdump of key/value")
 	flag.BoolVar(&verbose, "verbose", false, "Print verbose output")
 	flag.Uint32Var(&pid, "pid", 0, "Filter a specific PID")
 	flag.Uint32Var(&mapID, "map-id", 0, "Filter a specific map ID")
+	flag.StringVar(&probe, "probe", "", "Specify a specific probe method (kprobe, kprobe.multi, fexit)")
 	flag.Parse()
+
+	if probe != "" && !slices.Contains([]string{"kprobe", "kprobe.multi", "fexit"}, probe) {
+		log.Fatalf("Invalid probe method: %s", probe)
+	}
 
 	assert.NoErr(rlimit.RemoveMemlock(), "Failed to remove memlock rlimit: %v")
 
@@ -81,21 +87,24 @@ func main() {
 	}
 
 	slices.Sort(hooks)
+	haveFexit := mybtf.HaveEnumValue(btfSpec, "bpf_attach_type", "BPF_TRACE_FEXIT")
 	haveKprobeMulti := mybtf.HaveEnumValue(btfSpec, "bpf_attach_type", "BPF_TRACE_KPROBE_MULTI")
-	// haveKprobeMulti = false
-	if haveKprobeMulti {
-		delete(spec.Programs, fexitUpdateMapProgName)
-		delete(spec.Programs, fexitDeleteMapProgName)
-		if verbose {
-			log.Printf("Tracing functions with kprobe.multi:")
-			for _, hook := range hooks {
-				fmt.Printf("  %s\n", hook)
-			}
+	if probe == "fexit" && !haveFexit {
+		log.Fatalf("fexit is not supported by the kernel")
+	} else if probe == "kprobe.multi" && !haveKprobeMulti {
+		log.Fatalf("kprobe.multi is not supported by the kernel")
+	}
+	if probe == "" {
+		if haveKprobeMulti {
+			probe = "kprobe.multi"
+		} else if haveFexit {
+			probe = "fexit"
+		} else {
+			probe = "kprobe"
 		}
-		bk, err := kprobeFuncs(hooks, spec, reusedMaps)
-		assert.NoVerifierErr(err, "Failed to trace functions with kprobe.multi: %v")
-		defer bk.close()
-	} else {
+	}
+	useFexit := probe == "fexit"
+	if useFexit {
 		delete(spec.Programs, kprobeUpdateMapProgName)
 		delete(spec.Programs, kprobeDeleteMapProgName)
 		if verbose {
@@ -107,6 +116,18 @@ func main() {
 		t, err := traceFuncs(hooks, spec, reusedMaps)
 		assert.NoVerifierErr(err, "Failed to trace functions with fexit: %v")
 		defer t.close()
+	} else {
+		delete(spec.Programs, fexitUpdateMapProgName)
+		delete(spec.Programs, fexitDeleteMapProgName)
+		if verbose {
+			log.Printf("Tracing functions with %s:", probe)
+			for _, hook := range hooks {
+				fmt.Printf("  %s\n", hook)
+			}
+		}
+		bk, err := kprobeFuncs(hooks, spec, reusedMaps, probe == "kprobe.multi")
+		assert.NoVerifierErr(err, "Failed to trace functions with %s: %v", probe)
+		defer bk.close()
 	}
 
 	maps := newBpfMaps(btfSpec)
@@ -128,7 +149,7 @@ func main() {
 	})
 
 	errg.Go(func() error {
-		return readEvents(reader, maps, !haveKprobeMulti)
+		return readEvents(reader, maps, useFexit)
 	})
 
 	assert.NoErr(errg.Wait(), "Error: %v")

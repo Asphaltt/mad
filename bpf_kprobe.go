@@ -25,7 +25,7 @@ func (bk *bpfKprobe) close() {
 	}
 }
 
-func kprobeFuncs(hooks []string, spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map) (*bpfKprobe, error) {
+func kprobeFuncs(hooks []string, spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map, kprobeMulti bool) (*bpfKprobe, error) {
 	var updateMapHooks, deleteMapHooks []string
 
 	for _, hook := range hooks {
@@ -33,6 +33,13 @@ func kprobeFuncs(hooks []string, spec *ebpf.CollectionSpec, reusedMaps map[strin
 			updateMapHooks = append(updateMapHooks, hook)
 		} else {
 			deleteMapHooks = append(deleteMapHooks, hook)
+		}
+	}
+
+	if !kprobeMulti {
+		for _, p := range spec.Programs {
+			p.Type = ebpf.Kprobe
+			p.AttachType = 0
 		}
 	}
 
@@ -55,26 +62,48 @@ func kprobeFuncs(hooks []string, spec *ebpf.CollectionSpec, reusedMaps map[strin
 
 	if len(updateMapHooks) > 0 {
 		prog := coll.Programs[kprobeUpdateMapProgName]
-		l, err = link.KprobeMulti(prog, link.KprobeMultiOptions{
-			Symbols: updateMapHooks,
-		})
-		if err != nil {
-			return nil, err
-		}
+		if kprobeMulti {
+			l, err = link.KprobeMulti(prog, link.KprobeMultiOptions{
+				Symbols: updateMapHooks,
+			})
+			if err != nil {
+				return nil, err
+			}
 
-		bk.links = append(bk.links, l)
+			bk.links = append(bk.links, l)
+		} else {
+			for _, hook := range updateMapHooks {
+				l, err = link.Kprobe(hook, prog, nil)
+				if err != nil {
+					return nil, err
+				}
+
+				bk.links = append(bk.links, l)
+			}
+		}
 	}
 
 	if len(deleteMapHooks) > 0 {
 		prog := coll.Programs[kprobeDeleteMapProgName]
-		l, err = link.KprobeMulti(prog, link.KprobeMultiOptions{
-			Symbols: deleteMapHooks,
-		})
-		if err != nil {
-			return nil, err
-		}
+		if kprobeMulti {
+			l, err = link.KprobeMulti(prog, link.KprobeMultiOptions{
+				Symbols: deleteMapHooks,
+			})
+			if err != nil {
+				return nil, err
+			}
 
-		bk.links = append(bk.links, l)
+			bk.links = append(bk.links, l)
+		} else {
+			for _, hook := range deleteMapHooks {
+				l, err = link.Kprobe(hook, prog, nil)
+				if err != nil {
+					return nil, err
+				}
+
+				bk.links = append(bk.links, l)
+			}
+		}
 	}
 
 	return &bk, nil
