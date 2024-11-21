@@ -34,7 +34,7 @@ func (t *bpfTracings) close() {
 func (t *bpfTracings) traceFunc(fnName string, spec *ebpf.CollectionSpec, reusedMaps map[string]*ebpf.Map) error {
 	spec = spec.Copy()
 
-	isDelete := strings.HasSuffix(fnName, "_map_delete_elem")
+	isDelete := strings.HasSuffix(fnName, "_delete_elem")
 
 	const fexitUpdateElem = "fexit_update_elem"
 	const fexitDeleteElem = "fexit_delete_elem"

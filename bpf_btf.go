@@ -27,11 +27,11 @@ func isTgtFunc(typ btf.Type) (string, bool) {
 	fnName := fn.Name
 	fnProto := fn.Type.(*btf.FuncProto)
 
-	if strings.HasSuffix(fnName, "_map_update_elem") && len(fnProto.Params) == 4 {
+	if strings.HasSuffix(fnName, "_update_elem") && len(fnProto.Params) == 4 {
 		if isBpfMap(fnProto.Params[0].Type) && isVoid(fnProto.Params[1].Type) && isVoid(fnProto.Params[2].Type) {
 			return fnName, true
 		}
-	} else if strings.HasSuffix(fnName, "_map_delete_elem") && len(fnProto.Params) == 2 {
+	} else if strings.HasSuffix(fnName, "_delete_elem") && len(fnProto.Params) == 2 {
 		if isBpfMap(fnProto.Params[0].Type) && isVoid(fnProto.Params[1].Type) {
 			return fnName, true
 		}
